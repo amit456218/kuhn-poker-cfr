@@ -1,6 +1,14 @@
-// Typed client for the FastAPI backend. Next rewrites /api/* to the Python
-// server (see next.config.mjs), so the browser only ever talks to one origin.
-
+// The dashboard's data layer. Every call is served by the TypeScript solver in
+// ./solver, which runs in this browser tab - there is no server behind it.
+//
+// The method signatures are unchanged from when this was an HTTP client for the
+// FastAPI backend, so the pages do not know or care which one they are talking
+// to. That backend is still in the repo as the reference implementation, with
+// the test suite that pins these numbers down; `npm run parity` checks the two
+// against each other.
+//
+// Calls stay async because solving is genuinely slow enough to matter: long
+// runs chunk their work and yield to the event loop so the page keeps painting.
 export type Strategy = Record<string, number[]>;
 
 export interface Snapshot {
@@ -222,60 +230,45 @@ export interface TheoryResponse {
   notes: string[];
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    cache: "no-store",
+import { runtime } from "./solver/runtime";
+
+/** Let the current task finish painting before we start burning CPU. */
+const defer = <T>(fn: () => T): Promise<T> =>
+  new Promise((resolve, reject) => {
+    setTimeout(() => {
+      try {
+        resolve(fn());
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    }, 0);
   });
-  if (!res.ok) {
-    let detail = res.statusText;
-    try {
-      const body = await res.json();
-      detail = body.detail ?? detail;
-    } catch {
-      /* keep statusText */
-    }
-    throw new Error(`${res.status}: ${detail}`);
-  }
-  return res.json() as Promise<T>;
-}
 
 export const api = {
-  health: () => request<{ status: string }>("/api/health"),
-  rules: () => request<Rules>("/api/game/rules"),
-  infoSets: () => request<{ info_sets: InfoSetInfo[] }>("/api/game/info-sets"),
-  theory: (alpha: number) => request<TheoryResponse>(`/api/game/theory?alpha=${alpha}`),
-  baselines: () => request<{ baselines: Baseline[] }>("/api/game/baselines"),
-  solution: () => request<SolutionReport>("/api/solution"),
+  health: () => defer(() => runtime.health()),
+  rules: () => defer(() => runtime.rules() as unknown as Rules),
+  infoSets: () => defer(() => runtime.infoSets() as { info_sets: InfoSetInfo[] }),
+  theory: (alpha: number) => defer(() => runtime.theory(alpha) as TheoryResponse),
+  baselines: () => defer(() => runtime.baselines() as { baselines: Baseline[] }),
+  solution: () => defer(() => runtime.solution() as SolutionReport),
 
   startRun: (variant: string, iterations: number) =>
-    request<RunSummary>("/api/runs", {
-      method: "POST",
-      body: JSON.stringify({ variant, iterations }),
-    }),
-  getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
-  stopRun: (id: string) =>
-    request<{ stopped: boolean }>(`/api/runs/${id}/stop`, { method: "POST" }),
+    defer(() => runtime.startRun(variant, iterations) as RunSummary),
+  getRun: (id: string) => defer(() => runtime.getRun(id) as RunDetail),
+  /** Snapshots as the solver produces them; replaces the old SSE stream. */
+  streamRun: (id: string, handlers: {
+    onSnapshot: (snapshot: Snapshot) => void;
+    onEnd: () => void;
+    onError: (message: string) => void;
+  }) => runtime.streamRun(id, handlers),
+  stopRun: (id: string) => defer(() => runtime.stopRun(id)),
 
-  ablation: (iterations: number) =>
-    request<Ablation>(`/api/ablation?iterations=${iterations}`),
+  ablation: (iterations: number) => runtime.ablation(iterations) as Promise<Ablation>,
   evaluate: (hands: number, runId?: string) =>
-    request<EvaluationResult>("/api/evaluate", {
-      method: "POST",
-      body: JSON.stringify({ hands, run_id: runId ?? null }),
-    }),
+    runtime.evaluate(hands, runId) as Promise<EvaluationResult>,
 
   newTable: (opponent: string, humanSeat: number) =>
-    request<TableState>("/api/play/tables", {
-      method: "POST",
-      body: JSON.stringify({ opponent, human_seat: humanSeat }),
-    }),
-  deal: (id: string) =>
-    request<TableState>(`/api/play/tables/${id}/deal`, { method: "POST" }),
-  act: (id: string, action: string) =>
-    request<TableState>(`/api/play/tables/${id}/act`, {
-      method: "POST",
-      body: JSON.stringify({ action }),
-    }),
+    defer(() => runtime.newTable(opponent, humanSeat) as TableState),
+  deal: (id: string) => defer(() => runtime.deal(id) as TableState),
+  act: (id: string, action: string) => defer(() => runtime.act(id, action) as TableState),
 };

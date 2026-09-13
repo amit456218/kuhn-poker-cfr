@@ -29,7 +29,7 @@ export default function SolverPage() {
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
   const [evalBusy, setEvalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const streamRef = useRef<EventSource | null>(null);
+  const streamRef = useRef<{ close: () => void } | null>(null);
 
   useEffect(() => {
     api.infoSets().then((r) => setInfoSets(r.info_sets)).catch(() => {});
@@ -52,29 +52,23 @@ export default function SolverPage() {
     setRunning(true);
     try {
       const started = await api.startRun(variant, iterations);
-      const source = new EventSource(`/api/runs/${started.run_id}/stream`);
-      streamRef.current = source;
-
-      source.onmessage = (e) => {
-        const snap: Snapshot = JSON.parse(e.data);
-        setSnapshots((prev) => [...prev, snap]);
-      };
-      source.addEventListener("end", async () => {
-        source.close();
-        streamRef.current = null;
-        try {
-          setRun(await api.getRun(started.run_id));
-        } catch (err) {
-          setError(String(err));
-        }
-        setRunning(false);
+      streamRef.current = api.streamRun(started.run_id, {
+        onSnapshot: (snap: Snapshot) => setSnapshots((prev) => [...prev, snap]),
+        onEnd: async () => {
+          streamRef.current = null;
+          try {
+            setRun(await api.getRun(started.run_id));
+          } catch (err) {
+            setError(String(err));
+          }
+          setRunning(false);
+        },
+        onError: (message: string) => {
+          streamRef.current = null;
+          setRunning(false);
+          setError(message);
+        },
       });
-      source.onerror = () => {
-        source.close();
-        streamRef.current = null;
-        setRunning(false);
-        setError("Lost the connection to the training stream.");
-      };
     } catch (e) {
       setError(String(e));
       setRunning(false);

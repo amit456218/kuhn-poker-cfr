@@ -6,7 +6,9 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "parity": "python3 ../scripts/check_parity.py"
   },
   "dependencies": {
     "next": "15.5.4",

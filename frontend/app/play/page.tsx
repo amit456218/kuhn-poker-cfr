@@ -14,8 +14,12 @@ export default function PlayPage() {
   const [showHint, setShowHint] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Prerendered markup ships before React attaches handlers; without this a
+  // click in that window is silently dropped. See the same guard on /solver.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    setReady(true);
     api.baselines().then((r) => setBaselines(r.baselines)).catch(() => {});
   }, []);
 
@@ -78,7 +82,7 @@ export default function PlayPage() {
               <option value={1}>Player 2 (acts second)</option>
             </select>
           </label>
-          <button className="primary" onClick={start} disabled={busy}>
+          <button className="primary" onClick={start} disabled={busy || !ready}>
             {table ? "New session" : "Sit down"}
           </button>
           <label className="field" style={{ marginLeft: "auto" }}>

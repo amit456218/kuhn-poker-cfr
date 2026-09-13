@@ -22,6 +22,11 @@ export default function SolverPage() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [run, setRun] = useState<RunDetail | null>(null);
   const [running, setRunning] = useState(false);
+  // The page is prerendered, so its buttons exist in the HTML before React has
+  // attached any handlers. Without this, a click landing in that window is
+  // silently swallowed - the user presses Train and nothing whatsoever happens.
+  // Rendering the controls disabled until mount makes the gap visible instead.
+  const [ready, setReady] = useState(false);
   const [infoSets, setInfoSets] = useState<InfoSetInfo[]>([]);
   const [theory, setTheory] = useState<TheoryResponse | null>(null);
   const [ablation, setAblation] = useState<Ablation | null>(null);
@@ -32,6 +37,7 @@ export default function SolverPage() {
   const streamRef = useRef<{ close: () => void } | null>(null);
 
   useEffect(() => {
+    setReady(true);
     api.infoSets().then((r) => setInfoSets(r.info_sets)).catch(() => {});
     return () => streamRef.current?.close();
   }, []);
@@ -138,7 +144,7 @@ export default function SolverPage() {
         <div className="controls" style={{ marginBottom: 18 }}>
           <label className="field">
             ALGORITHM
-            <select value={variant} onChange={(e) => setVariant(e.target.value)} disabled={running}>
+            <select value={variant} onChange={(e) => setVariant(e.target.value)} disabled={running || !ready}>
               <option value="cfr+">CFR+ (regret matching+, alternating)</option>
               <option value="vanilla">Vanilla CFR (Zinkevich 2007)</option>
               <option value="linear">Linear CFR (Brown &amp; Sandholm 2019)</option>
@@ -146,13 +152,13 @@ export default function SolverPage() {
           </label>
           <label className="field">
             ITERATIONS
-            <select value={iterations} onChange={(e) => setIterations(Number(e.target.value))} disabled={running}>
+            <select value={iterations} onChange={(e) => setIterations(Number(e.target.value))} disabled={running || !ready}>
               {[1_000, 10_000, 100_000, 250_000, 500_000].map((n) => (
                 <option key={n} value={n}>{compactInt(n)}</option>
               ))}
             </select>
           </label>
-          <button className="primary" onClick={train} disabled={running}>
+          <button className="primary" onClick={train} disabled={running || !ready}>
             {running ? <><span className="spinner" /> Training…</> : "Train solver"}
           </button>
         </div>
@@ -227,7 +233,7 @@ export default function SolverPage() {
         <p className="card-sub">
           All three variants under an identical 20,000-iteration budget.
         </p>
-        <button onClick={runAblation} disabled={ablationBusy}>
+        <button onClick={runAblation} disabled={ablationBusy || !ready}>
           {ablationBusy ? <><span className="spinner" /> Running…</> : "Run ablation"}
         </button>
 
@@ -287,7 +293,7 @@ export default function SolverPage() {
           Exact expected value by enumeration, plus a 100,000-hand simulation with
           confidence intervals. Every matchup is played from both seats.
         </p>
-        <button onClick={runEvaluation} disabled={evalBusy}>
+        <button onClick={runEvaluation} disabled={evalBusy || !ready}>
           {evalBusy ? <><span className="spinner" /> Playing 100k hands ×7…</> : "Run tournament"}
         </button>
 

@@ -24,11 +24,11 @@ implementations are re-derived and compared on every push — see
 | --- | --- |
 | Exploitability @ 250K iterations (CFR+) | **1.23 × 10⁻⁶ chips/hand** (0.00012% of an ante) |
 | Exploitability @ 100K iterations (CFR+) | 2.14 × 10⁻⁶ chips/hand |
-| Solve time, 100K iterations | 6.3 s (pure Python, single core) |
+| Solve time, 100K iterations | 6.3 s (Python reference, single core) |
+| Solve time, 100K iterations | **0.46 s** (TypeScript, in-browser) |
 | Game value recovered | −0.055556 (exact: −1/18) |
-| Player 2's unique equilibrium | reproduced to < 0.001 absolute error |
+| Player 2's unique equilibrium | reproduced to 7.9 × 10⁻⁶ absolute error |
 | CFR+ vs vanilla CFR at 250K iterations | **363× lower exploitability** |
-| Solve time, 100K iterations (browser, TypeScript) | 0.46 s |
 | Tests | 47 passing |
 
 ### Against rule-based opponents

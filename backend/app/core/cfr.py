@@ -178,9 +178,13 @@ class CFRSolver:
         self.iterations = 0
         # Alternating updates walk the tree once per player per iteration, so
         # each player answers the other's freshly improved strategy rather than
-        # a stale snapshot. Measured on this game (see tests/test_convergence.py)
-        # this single choice matters more than regret matching+ does: it is
-        # worth ~2 orders of magnitude of exploitability on its own.
+        # a stale snapshot. This single scheduling choice matters more than
+        # regret matching+ does, though how much more depends on what else is
+        # switched on: starting from vanilla at a 20K budget it is worth ~23x
+        # against ~2x for regret matching+ alone, while on top of linear
+        # averaging at 50K it is worth ~700x. The ablation is pinned in
+        # tests/test_solver.py, under
+        # test_alternating_updates_contribute_more_than_regret_matching_plus.
         self.alternating = variant in ("cfr+", "linear")
         self.regret_matching_plus = variant == "cfr+"
 

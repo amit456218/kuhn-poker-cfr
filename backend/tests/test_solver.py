@@ -230,3 +230,47 @@ def test_log_spacing_is_sane():
     assert pts[0] == 1 and pts[-1] == 100000
     assert pts == sorted(set(pts))
     assert all(1 <= p <= 100000 for p in pts)
+
+
+def _solve_with(variant, alternating, regret_matching_plus, budget):
+    """Build a solver with the two CFR+ ingredients toggled independently."""
+    solver = CFRSolver(variant)
+    solver.alternating = alternating
+    solver.regret_matching_plus = regret_matching_plus
+    solver.train(budget, snapshot_at=[])
+    return exploitability(solver.average_strategy())
+
+
+def test_alternating_updates_contribute_more_than_regret_matching_plus():
+    """
+    Separate CFR+'s two ingredients and measure each one's contribution.
+
+    `test_cfr_plus_beats_vanilla_by_orders_of_magnitude` shows the pair is worth
+    two orders of magnitude together, but it cannot say which half earns it.
+    This can: hold the budget fixed and toggle alternating updates and regret
+    matching+ independently.
+
+    The result is not the intuitive one. Regret matching+ is the change CFR+ is
+    named for, yet on this game it is worth only a small constant factor on its
+    own. Alternating updates - each player answering the opponent's freshly
+    improved strategy instead of a stale snapshot - are worth an order of
+    magnitude more, and the two compound well beyond their product.
+
+    Thresholds are set well below the measured values so the test pins the
+    ordering without turning into a brittle benchmark.
+    """
+    budget = 20_000
+    both = _solve_with("cfr+", True, True, budget)
+    rm_plus_only = _solve_with("cfr+", False, True, budget)
+    alternating_only = _solve_with("vanilla", True, False, budget)
+    neither = _solve_with("vanilla", False, False, budget)
+
+    # Each ingredient helps on its own.
+    assert alternating_only < neither
+    assert rm_plus_only < neither
+
+    # Alternating updates are the larger of the two effects, by a wide margin.
+    assert alternating_only < rm_plus_only / 5
+
+    # And the combination beats either one alone.
+    assert both < alternating_only / 5

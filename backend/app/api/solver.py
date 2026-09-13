@@ -244,9 +244,9 @@ def ablation(iterations: int = Query(20_000, ge=100, le=200_000)) -> dict:
         "findings": [
             "Vanilla CFR converges at the theoretical O(1/sqrt(T)) rate.",
             "Alternating updates - each player answering the opponent's freshly "
-            "improved strategy rather than a stale snapshot - are worth about "
-            "two orders of magnitude on this game, more than regret matching+ "
-            "contributes on its own.",
+            "improved strategy rather than a stale snapshot - are worth ~23x on "
+            "this game against ~2x for regret matching+ alone. The ingredient "
+            "CFR+ is named for is the smaller half of it.",
             "Vanilla CFR's current strategy never converges; it orbits the "
             "equilibrium indefinitely. Only the running average settles. CFR+ "
             "is the exception - regret matching+ makes the current iterate "
